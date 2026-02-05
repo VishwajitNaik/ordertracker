@@ -11,6 +11,9 @@ import {
   Dimensions,
   ScrollView,
   Animated,
+  Keyboard,
+  TouchableWithoutFeedback,
+  FlatList as RNFlatList,
 } from "react-native";
 import { useAuthStore } from "@/store/authStore";
 import { Ionicons } from "@expo/vector-icons";
@@ -54,13 +57,107 @@ const getVehicleColor = (vehicleType: string) => {
   return '#007AFF';
 };
 
+// Google Places Autocomplete Component
+const GooglePlacesAutocomplete = ({ 
+  placeholder, 
+  value, 
+  onChangeText, 
+  onSelectLocation, 
+  style 
+}: { 
+  placeholder: string; 
+  value: string; 
+  onChangeText: (text: string) => void; 
+  onSelectLocation: (location: { text: string; lat: number; lng: number }) => void; 
+  style?: any; 
+}) => {
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const fetchPlaces = async (query: string) => {
+    if (query.length < 3) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    try {
+      // Using OpenStreetMap Nominatim API as a free alternative to Google Places
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`
+      );
+      const data = await response.json();
+      
+      const formattedSuggestions = data.map((item: any) => ({
+        id: item.place_id,
+        text: item.display_name,
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon)
+      }));
+      
+      setSuggestions(formattedSuggestions);
+      setShowSuggestions(true);
+    } catch (error) {
+      console.error('Error fetching places:', error);
+      setSuggestions([]);
+    }
+  };
+
+  const handleTextChange = (text: string) => {
+    onChangeText(text);
+    fetchPlaces(text);
+  };
+
+  const handleSelectSuggestion = (suggestion: any) => {
+    onChangeText(suggestion.text);
+    onSelectLocation({
+      text: suggestion.text,
+      lat: suggestion.lat,
+      lng: suggestion.lng
+    });
+    setSuggestions([]);
+    setShowSuggestions(false);
+  };
+
+  return (
+    <View style={[styles.autocompleteContainer, style]}>
+      <TextInput
+        placeholder={placeholder}
+        value={value}
+        onChangeText={handleTextChange}
+        style={styles.autocompleteInput}
+      />
+      {showSuggestions && suggestions.length > 0 && (
+        <View style={styles.suggestionsContainer}>
+          <RNFlatList
+            data={suggestions}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.suggestionItem}
+                onPress={() => handleSelectSuggestion(item)}
+              >
+                <Ionicons name="location-outline" size={16} color="#666" />
+                <Text style={styles.suggestionText} numberOfLines={1}>
+                  {item.text}
+                </Text>
+              </TouchableOpacity>
+            )}
+            style={styles.suggestionsList}
+          />
+        </View>
+      )}
+    </View>
+  );
+};
+
 export default function MainPage() {
   const { products, orders, fetchProducts, fetchOrders, addProduct, acceptProduct, acceptOrder, user, fetchVehicles, vehicles, token } = useAuthStore();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [fromAddressId, setFromAddressId] = useState("");
+  const [toAddressId, setToAddressId] = useState("");
   const [description, setDescription] = useState("");
   const [weight, setWeight] = useState("");
   const [image, setImage] = useState<any>(null);
@@ -113,8 +210,8 @@ export default function MainPage() {
     ).map(product => ({
       ...product,
       type: 'product',
-      from: product.fromAddress ? `${product.fromAddress.address}, ${product.fromAddress.city}, ${product.fromAddress.state} ${product.fromAddress.zipCode}` : product.from,
-      to: product.toAddress ? `${product.toAddress.address}, ${product.toAddress.city}, ${product.toAddress.state} ${product.toAddress.zipCode}` : product.to
+      from: product.fromLocation?.text || 'N/A',
+      to: product.toLocation?.text || 'N/A'
     })),
     ...orders.map(order => ({
       _id: order._id,
@@ -268,34 +365,34 @@ export default function MainPage() {
       alert('Please select an image');
       return;
     }
-    if (!from || !to || !description || !productPrice) {
-      alert('Please fill all required fields');
+    if (!fromAddressId || !toAddressId || !description || !productPrice) {
+      alert('Please select from and to addresses');
       return;
     }
-    addProduct({ 
-      Title: title, 
-      from, 
-      to, 
-      description, 
-      price: parseFloat(productPrice), 
-      weight, 
-      image, 
-      veichelType, 
-      video 
+    addProduct({
+      Title: title,
+      fromLocation: fromAddressId,
+      toLocation: toAddressId,
+      description,
+      price: parseFloat(productPrice),
+      weight,
+      image,
+      veichelType,
+      video
     });
     setModalVisible(false);
     resetForm();
   };
 
   const resetForm = () => {
-    setTitle(""); 
-    setFrom(""); 
-    setTo(""); 
-    setDescription(""); 
-    setProductPrice(""); 
-    setWeight(""); 
-    setImage(null); 
-    setVeichelType("Any"); 
+    setTitle("");
+    setFromAddressId("");
+    setToAddressId("");
+    setDescription("");
+    setProductPrice("");
+    setWeight("");
+    setImage(null);
+    setVeichelType("Any");
     setVideo(null);
   };
 
@@ -358,14 +455,14 @@ export default function MainPage() {
           <View style={styles.locationRow}>
             <Ionicons name="location-outline" size={10} color="#666" />
             <Text style={styles.locationText} numberOfLines={1}>
-              {item.from || "N/A"}
+              {item.fromLocation?.text || "N/A"}
             </Text>
           </View>
 
           <View style={styles.locationRow}>
             <Ionicons name="location" size={10} color="#666" />
             <Text style={styles.locationText} numberOfLines={1}>
-              {item.to || "N/A"}
+              {item.toLocation?.text || "N/A"}
             </Text>
           </View>
 
@@ -649,19 +746,24 @@ export default function MainPage() {
                 onChangeText={setTitle} 
                 style={styles.input} 
               />
-              <View style={styles.pickerContainer}>
-                <Text style={styles.pickerLabel}>From Address:</Text>
-                <View style={styles.pickerWrapper}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>From Address</Text>
+                <View style={styles.pickerContainer}>
                   <Picker
-                    selectedValue={from}
-                    onValueChange={(itemValue) => setFrom(itemValue)}
+                    selectedValue={fromAddressId}
+                    onValueChange={setFromAddressId}
                     style={styles.picker}
+                    dropdownIconColor={COLORS.primary}
                   >
-                    <Picker.Item label="Select from address..." value="" />
+                    <Picker.Item 
+                      label="Select from address..." 
+                      value="" 
+                      color="#999"
+                    />
                     {userAddresses.map((address) => (
                       <Picker.Item
                         key={address._id}
-                        label={`${address.address}, ${address.city}, ${address.state} - ${address.zipCode}`}
+                        label={`${address.label}: ${address.address}, ${address.city}, ${address.state} ${address.zipCode}`}
                         value={address._id}
                       />
                     ))}
@@ -669,19 +771,24 @@ export default function MainPage() {
                 </View>
               </View>
 
-              <View style={styles.pickerContainer}>
-                <Text style={styles.pickerLabel}>To Address:</Text>
-                <View style={styles.pickerWrapper}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>To Address</Text>
+                <View style={styles.pickerContainer}>
                   <Picker
-                    selectedValue={to}
-                    onValueChange={(itemValue) => setTo(itemValue)}
+                    selectedValue={toAddressId}
+                    onValueChange={setToAddressId}
                     style={styles.picker}
+                    dropdownIconColor={COLORS.primary}
                   >
-                    <Picker.Item label="Select to address..." value="" />
+                    <Picker.Item 
+                      label="Select to address..." 
+                      value="" 
+                      color="#999"
+                    />
                     {userAddresses.map((address) => (
                       <Picker.Item
                         key={address._id}
-                        label={`${address.address}, ${address.city}, ${address.state} - ${address.zipCode}`}
+                        label={`${address.label}: ${address.address}, ${address.city}, ${address.state} ${address.zipCode}`}
                         value={address._id}
                       />
                     ))}
@@ -1259,6 +1366,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: "#FAFAFA",
   },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
   textArea: {
     minHeight: 80,
     textAlignVertical: 'top',
@@ -1370,5 +1486,51 @@ const styles = StyleSheet.create({
   clearSearchButton: {
     padding: 4,
     marginLeft: 8,
+  },
+  autocompleteContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  autocompleteInput: {
+    borderWidth: 1.5,
+    borderColor: "#E0E0E0",
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 16,
+    backgroundColor: "#FAFAFA",
+    marginBottom: 8,
+  },
+  suggestionsContainer: {
+    position: 'absolute',
+    top: 56,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    maxHeight: 200,
+    zIndex: 1000,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  suggestionText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+    marginLeft: 8,
+  },
+  suggestionsList: {
+    maxHeight: 200,
   },
 });

@@ -45,14 +45,36 @@ const travelSchema = new mongoose.Schema({
                 ref: 'User',
                 required: true,
             },
+            fromUserId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+                required: true,
+            },
+            toUserId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+                required: true,
+            },
             productId: {
                 type: mongoose.Schema.Types.ObjectId,
                 ref: 'Product',
+            },
+            orderId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Order',
+            },
+            requestType: {
+                type: String,
+                enum: ['product', 'order'],
                 required: true,
             },
             price: {
                 type: Number,
                 required: true,
+            },
+            message: {
+                type: String,
+                default: '',
             },
             status: {
                 type: String,

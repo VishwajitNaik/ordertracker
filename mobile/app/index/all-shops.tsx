@@ -20,11 +20,23 @@ import { LinearGradient } from "expo-linear-gradient";
 const { width, height } = Dimensions.get("window");
 const isSmallDevice = width < 375;
 
+interface Address {
+  _id: string;
+  label: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  lat: number;
+  lng: number;
+  isDefault: boolean;
+}
+
 interface Shop {
   _id: string;
   name: string;
   shopType: string;
-  location: string;
+  location: Address;
   images: string[];
   openingTime: string;
   closingTime: string;
@@ -160,7 +172,9 @@ export default function AllShops() {
             </View>
             <View style={styles.cardRow}>
               <Ionicons name="location" size={16} color="#64748b" />
-              <Text style={styles.cardText} numberOfLines={2}>Location: {item.location}</Text>
+              <Text style={styles.cardText} numberOfLines={2}>
+                Location: {item.location && item.location.address ? `${item.location.address}, ${item.location.city}` : 'N/A'}
+              </Text>
             </View>
             <View style={styles.cardRow}>
               <Ionicons name="time" size={16} color="#64748b" />

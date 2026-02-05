@@ -128,7 +128,7 @@ router.post('/login', async (req, res) => {
             user = await User.findOne({ email: identifier });
         } else {
             // It's a phone number
-            user = await User.findOne({ phone: parseInt(identifier) });
+            user = await User.findOne({ phone: identifier });
         }
 
         if (!user) {

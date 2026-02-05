@@ -306,6 +306,36 @@ io.on('connection', (socket) => {
   socket.on("message-received-ack", ({ messageId, userId }) => {
     console.log(`📨 Message ${messageId} received acknowledgment from user ${userId}`);
   });
+
+  // Join order tracking room for live GPS
+  socket.on("join:order-tracking", ({ orderId }) => {
+    socket.join(`order:${orderId}`);
+    console.log(`🧭 Joined order tracking room ${orderId}`);
+  });
+
+  // Receive live GPS from delivery person for orders
+  socket.on("order:location-update", async ({ orderId, lat, lng }) => {
+    try {
+      // Import Order model
+      const Order = mongoose.model('Order');
+
+      // Save last location (optional but recommended)
+      await Order.findByIdAndUpdate(orderId, {
+        liveLocation: { lat, lng, updatedAt: new Date() }
+      });
+
+      // Emit to everyone watching this order (order creator + delivery person)
+      io.to(`order:${orderId}`).emit("order:location-receive", {
+        lat,
+        lng,
+        updatedAt: new Date(),
+      });
+
+      console.log(`📍 Order ${orderId} location updated: ${lat}, ${lng}`);
+    } catch (error) {
+      console.error('❌ Error updating order location:', error);
+    }
+  });
 });
 
 server.listen(3001, () => {

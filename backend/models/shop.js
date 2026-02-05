@@ -14,7 +14,8 @@ const shopSchema = new mongoose.Schema({
         default: [],
     },
     location: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Address',
         required: true,
     },
     openingTime: {

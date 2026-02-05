@@ -6,11 +6,23 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "@/store/authStore";
 
 // Import Product interface from authStore
+interface Address {
+  _id: string;
+  label: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  lat: number;
+  lng: number;
+  isDefault: boolean;
+}
+
 type Shop = {
   _id: string;
   name: string;
   shopType: string;
-  location: string;
+  location: Address;
   images: string[];
   openingTime: string;
   closingTime: string;
@@ -163,7 +175,20 @@ export default function Home() {
       }
     };
 
+    const initializeWallet = async () => {
+      const { user, token } = useAuthStore.getState();
+      if (user && token) {
+        try {
+          await useAuthStore.getState().fetchWalletBalance();
+          await useAuthStore.getState().fetchWalletStats();
+        } catch (error) {
+          console.log("Wallet initialization:", error);
+        }
+      }
+    };
+    
     loadData();
+    initializeWallet();
 
     // Start animations when component mounts
     Animated.parallel([
@@ -424,7 +449,7 @@ export default function Home() {
           showsHorizontalScrollIndicator={false} 
           contentContainerStyle={styles.actionsScroll}
         >
-          {[
+           {[
             { icon: "storefront-outline", label: "Add Shop", route: "/shop" },
             { icon: "people-outline", label: "Create Group", route: "/group" },
             { icon: "car-outline", label: "Add Vehicle", route: "/vehicle" },
@@ -432,7 +457,8 @@ export default function Home() {
             { icon: "chatbubble-outline", label: "Messages", route: "/message" },
             { icon: "person-circle-outline", label: "You", route: "/you" },
             { icon: "cube-outline", label: "My Products", route: "/userProducts" },
-            { icon: "cart-outline", label: "Shop Items", route: "/shop-items" }
+            { icon: "cart-outline", label: "Shop Items", route: "/shop-items" },
+            { icon: "wallet-outline", label: "My Wallet", route: "/wallet" }
           ].map((action, index) => (
             <View key={index} style={styles.actionCardWrapper}>
               <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
@@ -508,7 +534,7 @@ export default function Home() {
                   <View style={styles.shopLocation}>
                     <Ionicons name="location-outline" size={12} color="#666" />
                     <Text style={styles.shopLocationText} numberOfLines={1}>
-                      {shop.location}
+                      {shop.location && shop.location.address ? `${shop.location.address}, ${shop.location.city}` : 'N/A'}
                     </Text>
                   </View>
                   <View style={styles.shopStatus}>

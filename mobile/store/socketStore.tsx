@@ -9,6 +9,8 @@ interface SocketStore {
   connect: (userId: string) => void;
   disconnect: () => void;
   sendMessage: (senderId: string, receiverId: string, message: string, username: string) => void;
+  onTravelRequestAccepted: (callback: (data: { productId: string, travelId: string }) => void) => void;
+  removeTravelRequestAcceptedListener: () => void;
 }
 
 export const useSocketStore = create<SocketStore>((set, get) => ({
@@ -54,6 +56,20 @@ export const useSocketStore = create<SocketStore>((set, get) => ({
       });
     } else {
       console.error('❌ Frontend: Socket not connected');
+    }
+  },
+
+  onTravelRequestAccepted: (callback: (data: { productId: string, travelId: string }) => void) => {
+    const { socket } = get();
+    if (socket) {
+      socket.on('travelRequestAccepted', callback);
+    }
+  },
+
+  removeTravelRequestAcceptedListener: () => {
+    const { socket } = get();
+    if (socket) {
+      socket.off('travelRequestAccepted');
     }
   }
 }));

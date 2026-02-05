@@ -1,4 +1,3 @@
-// store/authStore.ts
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert, Platform } from "react-native";
@@ -19,15 +18,16 @@ interface Address {
   city: string;
   state: string;
   zipCode: string;
+  lat: number;
+  lng: number;
+  isDefault: boolean;
 }
 
 interface Product {
   _id: string;
   Title: string;
-  from: string;
-  to: string;
-  fromAddress?: Address;
-  toAddress?: Address;
+  fromLocation: { text: string; lat: number; lng: number };
+  toLocation: { text: string; lat: number; lng: number };
   description: string;
   price?: number;
   weight: string;
@@ -57,11 +57,21 @@ interface Shop {
   _id: string;
   name: string;
   shopType: string;
-  location: string;
+  location: Address;
   images: string[];
   openingTime: string;
   closingTime: string;
   status: string;
+}
+
+interface ShopInput {
+  name: string;
+  shopType: string;
+  location: string;
+  images: any[];
+  openingTime: string;
+  closingTime: string;
+  status: "open" | "closed";
 }
 
 interface Item {
@@ -109,9 +119,18 @@ interface Travel{
   createdBy?: {
     _id: string;
     username: string;
+    phone?: string;
   };
   requestedUsers?: {
     userId: {
+      _id: string;
+        username: string;
+      };
+    fromUserId?: {
+      _id: string;
+      username: string;
+    };
+    toUserId?: {
       _id: string;
       username: string;
     };
@@ -162,9 +181,55 @@ interface Vehicle {
   updatedAt?: string;
 }
 
+interface Wallet {
+  balance: number;
+  availableBalance: number;
+  lockedBalance: number;
+  totalEarned: number;
+  totalWithdrawn: number;
+  bankDetails?: {
+    accountHolderName: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+    isVerified: boolean;
+  };
+  upiId?: string;
+  isActive: boolean;
+}
+
+interface WalletTransaction {
+  id: string;
+  amount: number;
+  type: 'credit' | 'debit';
+  description: string;
+  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  paymentMethod: 'razorpay' | 'upi' | 'bank_transfer' | 'card' | 'wallet' | 'delivery_earning';
+  referenceId?: string;
+  createdAt: string;
+}
+
+interface WalletStats {
+  balance: number;
+  availableBalance: number;
+  lockedBalance: number;
+  totalEarned: number;
+  totalWithdrawn: number;
+  totalTransactions: number;
+  thisMonthEarnings: number;
+  hasBankDetails: boolean;
+  hasUpiId: boolean;
+}
+
+
+
+
 interface AuthStore {
   user: any;
   token: string | null;
+  wallet: Wallet | null;
+  walletTransactions: WalletTransaction[];
+  walletStats: WalletStats | null;
   isLoading: boolean;
   products: Product[];
   orders: any[];
@@ -172,16 +237,32 @@ interface AuthStore {
   allShops: Shop[];
   allShopsPagination: any;
   userDashboard: any;
-  addShop: (shop: Omit<Shop, "_id">) => Promise<void>;
+  addresses: Address[];
+  addShop: (shop: ShopInput) => Promise<void>;
   item: Item[];
   subItems: SubItem[];
+    // Wallet methods
+  fetchWalletBalance: () => Promise<void>;
+  fetchWalletStats: () => Promise<void>;
+  fetchWalletTransactions: (filters?: any) => Promise<void>;
+  addMoneyToWallet: (amount: number, paymentMethod?: string, referenceId?: string) => Promise<any>;
+  requestWithdrawal: (amount: number, withdrawalMethod?: 'bank' | 'upi') => Promise<any>;
+  saveBankDetails: (bankDetails: {
+    accountHolderName: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+  }) => Promise<any>;
+  saveUpiId: (upiId: string) => Promise<any>;
   addItem: (item: Omit<Item, "_id">) => Promise<void>;
   vehicles: Vehicle[];
   addVehicle: (vehicle: Omit<Vehicle, "_id">) => Promise<void>;
   addSubItem: (subItem: Omit<SubItem, "_id">) => Promise<void>;
   travel: Travel[];
+  currentTravel: Travel | null;
   addTravel: (travel: Omit<Travel, "_id">) => Promise<void>;
   fetchSubItems: (parentId: string) => Promise<void>;
+  fetchAddresses: () => Promise<void>;
   register: (username: string, email: string, phone: string, password: string) => Promise<{ success: boolean; error?: string }>;
   login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
   checkAuth: () => Promise<{ success: boolean; error?: string }>;
@@ -193,13 +274,14 @@ interface AuthStore {
   fetchUserDashboard: (userId: string) => Promise<void>;
   fetchItems: () => Promise<void>;
   fetchTravel: () => Promise<void>;
+  fetchTravelById: (travelId: string) => Promise<void>;
   fetchAllUserSideTravels: () => Promise<void>;
   fetchVehicles: () => Promise<void>;
   startTravel: (travelId: string) => Promise<void>;
   endTravel: (travelId: string) => Promise<void>;
-  sendTravelRequest: (travelId: string, productId: string, price: number) => Promise<void>;
-  acceptTravelRequest: (travelId: string, userId: string, productId: string) => Promise<void>;
-  addProduct: (productData: { Title: string; from: string; to: string; description: string; price: number; weight: string; veichelType: string; image: any; video?: any }) => Promise<void>;
+  sendTravelRequest: (travelId: string, productId: string, price: number, message?: string) => Promise<void>;
+  acceptTravelRequest: (travelId: string, userId: string, productId: string, tentativeTime?: string, vehicleType?: string, price?: number) => Promise<void>;
+  addProduct: (productData: { Title: string; fromLocation: string; toLocation: string; description: string; price: number; weight: string; veichelType: string; image: any; video?: any }) => Promise<void>;
   acceptProduct: (productId: string, acceptData: { tentativeDeliveryTime: string; acceptedVehicleType: string; price: number }) => Promise<void>;
   acceptOrder: (orderId: string, acceptData: { tentativeDeliveryTime: string; acceptedVehicleType: string; price: number }) => Promise<void>;
   updateOrderBid: (orderId: string, userId: string, newPrice: number) => Promise<void>;
@@ -207,7 +289,7 @@ interface AuthStore {
   updateDeliveryStatus: (orderId: string, userId: string, status: string) => Promise<void>;
   updateProduct: (productId: string, updatedFields: Partial<Omit<Product, "_id">>) => Promise<void>;
   updateBid: (productId: string, userId: string, newPrice: number) => Promise<void>;
-  confirmBid: (productId: string, userId: string) => Promise<void>;
+  confirmBid: (productId: string, userId: string, paymentData?: any) => Promise<void>;
   // Cart functionality
   cart: any;
   getCart: () => Promise<void>;
@@ -226,13 +308,423 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   orders: [],
   shops: [],
   allShops: [],
+  wallet: null,
+  walletTransactions: [],
+  walletStats: null,
   allShopsPagination: null,
   userDashboard: null,
+  addresses: [],
   item: [],
   subItems: [],
   vehicles: [],
   travel:[],
+  currentTravel: null,
   cart: { items: [], totalAmount: 0, itemCount: 0 },
+
+
+    // Fetch wallet balance
+  fetchWalletBalance: async () => {
+    try {
+      const token = get().token;
+      if (!token) throw new Error("No token found");
+
+      const res = await fetch("http://localhost:3000/api/wallet/balance", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.message || "Failed to fetch wallet balance");
+      
+      if (data.success) {
+        set({ wallet: data.wallet });
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error("Error fetching wallet balance:", error.message);
+      throw error;
+    }
+  },
+
+   // Fetch wallet statistics
+  fetchWalletStats: async () => {
+    try {
+      const token = get().token;
+      if (!token) throw new Error("No token found");
+
+      const res = await fetch("http://localhost:3000/api/wallet/stats", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.message || "Failed to fetch wallet stats");
+      
+      if (data.success) {
+        set({ walletStats: data.stats });
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error("Error fetching wallet stats:", error.message);
+      throw error;
+    }
+  },
+
+   // Fetch wallet transactions with filters
+  fetchWalletTransactions: async (filters = {}) => {
+    try {
+      const token = get().token;
+      if (!token) throw new Error("No token found");
+
+      // Build query string from filters
+      const queryParams = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, value.toString());
+        }
+      });
+
+      const url = `http://localhost:3000/api/wallet/transactions${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.message || "Failed to fetch transactions");
+      
+      if (data.success) {
+        // set({ : data.transactions });
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error("Error fetching wallet transactions:", error.message);
+      throw error;
+    }
+  },
+
+   addMoneyToWallet: async (amount: number, paymentMethod = 'razorpay', referenceId?: string) => {
+    try {
+      const token = get().token;
+      if (!token) throw new Error("No token found");
+
+      const res = await fetch("http://localhost:3000/api/wallet/add-money", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          amount,
+          paymentMethod,
+          referenceId,
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.message || "Failed to add money to wallet");
+      
+      if (data.success) {
+        // Update wallet balance in store
+        await get().fetchWalletBalance();
+        await get().fetchWalletStats();
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error("Error adding money to wallet:", error.message);
+      throw error;
+    }
+  },
+
+   // Request withdrawal
+  requestWithdrawal: async (amount: number, withdrawalMethod = 'bank') => {
+    try {
+      const token = get().token;
+      if (!token) throw new Error("No token found");
+
+      const res = await fetch("http://localhost:3000/api/wallet/withdraw", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          amount,
+          withdrawalMethod,
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.message || "Failed to process withdrawal");
+      
+      if (data.success) {
+        // Update wallet balance and stats
+        await get().fetchWalletBalance();
+        await get().fetchWalletStats();
+        await get().fetchWalletTransactions();
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error("Error processing withdrawal:", error.message);
+      throw error;
+    }
+  },
+
+  // Save bank details
+  saveBankDetails: async (bankDetails) => {
+    try {
+      const token = get().token;
+      if (!token) throw new Error("No token found");
+
+      const res = await fetch("http://localhost:3000/api/wallet/bank-details", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(bankDetails),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.message || "Failed to save bank details");
+      
+      if (data.success) {
+        // Update wallet with new bank details
+        await get().fetchWalletBalance();
+        await get().fetchWalletStats();
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error("Error saving bank details:", error.message);
+      throw error;
+    }
+  },
+  
+  // Save UPI ID
+  saveUpiId: async (upiId) => {
+    try {
+      const token = get().token;
+      if (!token) throw new Error("No token found");
+
+      const res = await fetch("http://localhost:3000/api/wallet/upi-id", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ upiId }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.message || "Failed to save UPI ID");
+      
+      if (data.success) {
+        // Update wallet with new UPI ID
+        await get().fetchWalletBalance();
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error("Error saving UPI ID:", error.message);
+      throw error;
+    }
+  },
+
+  // ========== ENHANCED CHECKOUT WITH WALLET ==========
+
+  // Update checkout to support wallet payment
+  checkout: async (paymentMethod = 'razorpay', paymentData = {}) => {
+    try {
+      const token = get().token;
+      if (!token) throw new Error("No token found");
+
+      const res = await fetch("http://localhost:3000/api/cart/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          paymentMethod,
+          ...paymentData,
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.message || "Checkout failed");
+      
+      if (data.success) {
+        // Clear cart
+        set({ cart: { items: [], totalAmount: 0, itemCount: 0 } });
+        
+        // If wallet payment was used, update wallet balance
+        if (paymentMethod === 'wallet') {
+          await get().fetchWalletBalance();
+          await get().fetchWalletStats();
+          await get().fetchWalletTransactions();
+        }
+        
+        Alert.alert("Success", data.message);
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error("Error during checkout:", error.message);
+      throw error;
+    }
+  },
+
+  confirmBid: async (productId, userId, paymentData = {}) => {
+    try {
+      const token = get().token;
+      if (!token) throw new Error("No token found");
+
+      console.log('💰 Confirm bid with payment data:', {
+        productId,
+        userId,
+        paymentData
+      });
+
+      const res = await fetch(`http://localhost:3000/api/products/${productId}/confirm-bid`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          userId,
+          razorpay_order_id: paymentData.razorpay_order_id,
+          razorpay_payment_id: paymentData.razorpay_payment_id,
+          razorpay_signature: paymentData.razorpay_signature,
+          paymentMethod: paymentData.paymentMethod || 'razorpay',
+          paidAmount: paymentData.paidAmount,
+          useWallet: paymentData.useWallet || false,
+          walletAmount: paymentData.walletAmount || 0
+        }),
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to confirm bid");
+
+      Alert.alert("Success", "Bid confirmed successfully! Product is now in-transit.");
+      
+      // Refresh products after confirming bid
+      get().fetchProducts();
+      
+      // If wallet was used, update wallet balance
+      if (paymentData.useWallet) {
+        await get().fetchWalletBalance();
+        await get().fetchWalletStats();
+        await get().fetchWalletTransactions();
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error("Error confirming bid:", error.message);
+      Alert.alert("Error", error.message || "Failed to confirm bid");
+      throw error;
+    }
+  },
+
+   // Add this to your existing checkAuth method
+  checkAuth: async () => {
+    try {
+      const token = await storage.getItem("token");
+      const userJson = await storage.getItem("user");
+      const user = userJson ? JSON.parse(userJson) : null;
+
+      if (token && user) {
+        set({ user, token });
+
+        // Connect socket for real-time messaging
+        useSocketStore.getState().connect(user._id);
+        
+        // Initialize wallet data when user is authenticated
+        try {
+          await get().fetchWalletBalance();
+          await get().fetchWalletStats();
+        } catch (walletError) {
+          console.log("Wallet not initialized yet, will be created on first access");
+        }
+
+        return { success: true };
+      }
+      return { success: false, error: "No token or user found" };
+    } catch (error: any) {
+      return { success: false, error: error.message || "Unknown error" };
+    }
+  },
+
+  // ========== UTILITY METHODS ==========
+
+  // Get formatted wallet balance for display
+  getFormattedBalance: () => {
+    const wallet = get().wallet;
+    return wallet ? {
+      balance: wallet.balance.toFixed(2),
+      available: wallet.availableBalance.toFixed(2),
+      locked: wallet.lockedBalance.toFixed(2),
+      totalEarned: wallet.totalEarned.toFixed(2),
+      totalWithdrawn: wallet.totalWithdrawn.toFixed(2),
+    } : null;
+  },
+
+  // Check if user can afford amount from wallet
+  canAffordFromWallet: (amount: number) => {
+    const wallet = get().wallet;
+    return wallet ? wallet.availableBalance >= amount : false;
+  },
+
+   addDeliveryEarning: async (amount: number, productId: string, deliveryDetails = {}) => {
+    try {
+      const token = get().token;
+      if (!token) throw new Error("No token found");
+
+      const res = await fetch("http://localhost:3000/api/wallet/add-delivery-earning", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          amount,
+          productId,
+          deliveryDetails,
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.message || "Failed to add delivery earning");
+      
+      if (data.success) {
+        // Update wallet balance and stats
+        await get().fetchWalletBalance();
+        await get().fetchWalletStats();
+        await get().fetchWalletTransactions();
+        
+        // Show notification to user
+        ToastManager.show(`₹${amount} added to wallet for delivery!`, "success");
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error("Error adding delivery earning:", error.message);
+      ToastManager.show(error.message || "Failed to add delivery earning", "error");
+      throw error;
+    }
+  },
+
+  
 
   addTravel: async (travel) => {
     try {
@@ -269,6 +761,18 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     } catch (error: any) {
       console.error("Error fetching travels:", error.message);
       Alert.alert("Error", error.message || "Failed to fetch travels");
+    }
+  },
+
+  fetchTravelById: async (travelId: string) => {
+    try {
+      const res = await fetch(`http://localhost:3000/api/travels/${travelId}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to fetch travel");
+      set({ currentTravel: data });
+    } catch (error: any) {
+      console.error("Error fetching travel by ID:", error.message);
+      Alert.alert("Error", error.message || "Failed to fetch travel");
     }
   },
 
@@ -322,7 +826,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  sendTravelRequest: async (travelId, productId, price) => {
+  sendTravelRequest: async (travelId, productId, price, message) => {
    try {
      const token = get().token;
      if (!token) throw new Error("No token found");
@@ -332,20 +836,22 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
          "Content-Type": "application/json",
          Authorization: `Bearer ${token}`,
        },
-       body: JSON.stringify({ productId, price }),
+       body: JSON.stringify({ productId, price, message }),
      });
      const data = await res.json();
      if (!res.ok) throw new Error(data.message || "Failed to send request");
-     Alert.alert("Success", "Request sent successfully!");
-     // Refresh travel data
+     ToastManager.show("Request sent successfully!", "success");
+     // Refresh current travel data
+     get().fetchTravelById(travelId);
+     // Refresh all travels list
      get().fetchAllUserSideTravels();
    } catch (error: any) {
      console.error("Error sending request:", error.message);
-     Alert.alert("Error", error.message || "Failed to send request");
+     ToastManager.show(error.message || "Failed to send request", "error");
    }
  },
 
-  acceptTravelRequest: async (travelId, userId, productId) => {
+  acceptTravelRequest: async (travelId, userId, productId, tentativeTime, vehicleType, price) => {
     try {
       const token = get().token;
       if (!token) throw new Error("No token found");
@@ -355,7 +861,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ userId, productId }),
+        body: JSON.stringify({ userId, productId, tentativeTime, vehicleType, price }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to accept request");
@@ -778,26 +1284,6 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  checkAuth: async () => {
-    try {
-      const token = await storage.getItem("token");
-      const userJson = await storage.getItem("user");
-      const user = userJson ? JSON.parse(userJson) : null;
-
-      if (token && user) {
-        set({ user, token });
-
-        // Connect socket for real-time messaging
-        useSocketStore.getState().connect(user._id);
-
-        return { success: true };
-      }
-      return { success: false, error: "No token or user found" };
-    } catch (error: any) {
-      return { success: false, error: error.message || "Unknown error" };
-    }
-  },
-
   logout: async () => {
     await storage.removeItem("user");
     await storage.removeItem("token");
@@ -847,8 +1333,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       const formData = new FormData();
       formData.append('Title', productData.Title);
-      formData.append('from', productData.from);
-      formData.append('to', productData.to);
+      formData.append('fromLocation', productData.fromLocation);
+      formData.append('toLocation', productData.toLocation);
       formData.append('description', productData.description);
       formData.append('price', productData.price.toString());
       formData.append('weight', productData.weight);
@@ -939,6 +1425,24 @@ updateProduct: async (productId, updatedFields) => {
     }
   },
 
+  fetchAddresses: async () => {
+    try {
+      const token = get().token;
+      if (!token) throw new Error("No token found");
+      const user = get().user;
+      if (!user) throw new Error("User not found");
+      const res = await fetch(`http://localhost:3000/api/userdetails/addresses/${user._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to fetch addresses");
+      set({ addresses: data });
+    } catch (error: any) {
+      console.error("Error fetching addresses:", error.message);
+      Alert.alert("Error", error.message || "Failed to fetch addresses");
+    }
+  },
+
   fetchAllShops: async (page = 1, limit = 20) => {
     try {
       const res = await fetch(`http://localhost:3000/api/shops/all?page=${page}&limit=${limit}`);
@@ -989,7 +1493,7 @@ updateProduct: async (productId, updatedFields) => {
       if (!token) throw new Error("No token found");
       if (!user) throw new Error("No user found");
 
-      const res = await fetch(`http://localhost:3000/api/products/products/${productId}/accept`, {
+      const res = await fetch(`http://localhost:3000/api/products/${productId}/accept`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1131,6 +1635,7 @@ updateProduct: async (productId, updatedFields) => {
       const formData = new FormData();
       formData.append('name', shop.name);
       formData.append('shopType', shop.shopType);
+      // Handle location - should be string (address ID)
       formData.append('location', shop.location);
       formData.append('openingTime', shop.openingTime);
       formData.append('closingTime', shop.closingTime);
@@ -1218,7 +1723,7 @@ updateProduct: async (productId, updatedFields) => {
       const token = get().token;
       if (!token) throw new Error("No token found");
 
-      const res = await fetch(`http://localhost:3000/api/products/products/${productId}/update-bid`, {
+      const res = await fetch(`http://localhost:3000/api/products/${productId}/update-bid`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -1241,32 +1746,42 @@ updateProduct: async (productId, updatedFields) => {
     }
   },
 
-  confirmBid: async (productId, userId) => {
-    try {
-      const token = get().token;
-      if (!token) throw new Error("No token found");
+  // confirmBid: async (productId, userId, paymentData: any = {}) => {
+  //   try {
+  //     const token = get().token;
+  //     if (!token) throw new Error("No token found");
 
-      const res = await fetch(`http://localhost:3000/api/products/products/${productId}/confirm-bid`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          userId
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to confirm bid");
+  //     // Add payment method to payment data if not present
+  //     const paymentDataWithMethod = {
+  //       ...paymentData,
+  //       paymentMethod: paymentData.paymentMethod || 'razorpay'
+  //     };
 
-      Alert.alert("Success", "Bid confirmed successfully! Product is now in-transit.");
-      // Refresh products after confirming bid
-      get().fetchProducts();
-    } catch (error: any) {
-      console.error("Error confirming bid:", error.message);
-      Alert.alert("Error", error.message || "Failed to confirm bid");
-    }
-  },
+  //     const res = await fetch(`http://localhost:3000/api/products/${productId}/confirm-bid`, {
+  //       method: "PUT",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //         Authorization: `Bearer ${token}`,
+  //       },
+  //       body: JSON.stringify({
+  //         userId,
+  //         ...paymentDataWithMethod // Include all payment details with method
+  //       }),
+  //     });
+  //     const data = await res.json();
+  //     if (!res.ok) throw new Error(data.message || "Failed to confirm bid");
+
+  //     Alert.alert("Success", "Bid confirmed successfully! Product is now in-transit.");
+  //     // Refresh products after confirming bid
+  //     get().fetchProducts();
+  //   } catch (error: any) {
+  //     console.error("Error confirming bid:", error.message);
+  //     Alert.alert("Error", error.message || "Failed to confirm bid");
+  //   }
+  // },
+
+  // In your authStore.js - UPDATE THIS:
+
 
   // Cart functionality
   getCart: async () => {
@@ -1407,26 +1922,4 @@ updateProduct: async (productId, updatedFields) => {
       ToastManager.show(error.message || "Failed to clear cart", "error");
     }
   },
-
-  checkout: async () => {
-    try {
-      const token = get().token;
-      if (!token) throw new Error("No token found");
-
-      const res = await fetch("http://localhost:3000/api/cart/checkout", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Checkout failed");
-
-      set({ cart: { items: [], totalAmount: 0, itemCount: 0 } });
-      Alert.alert("Success", data.message);
-    } catch (error: any) {
-      console.error("Error during checkout:", error.message);
-      Alert.alert("Error", error.message || "Checkout failed");
-    }
-  },
-
-
 }));

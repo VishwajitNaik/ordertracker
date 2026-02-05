@@ -1,373 +1,4 @@
-// import React, { useEffect, useState } from "react";
-// import {
-//   View,
-//   Text,
-//   StyleSheet,
-//   ScrollView,
-//   TouchableOpacity,
-//   ActivityIndicator,
-//   Alert,
-//   Image,
-// } from "react-native";
-// import { useLocalSearchParams, router } from "expo-router";
-// import { useAuthStore } from "@/store/authStore";
-// import COLORS from "@/constants/color";
-// import { Ionicons } from "@expo/vector-icons";
-
-// interface Travel {
-//   _id: string;
-//   vehicleId?: {
-//     _id: string;
-//     vehicleType: string;
-//     vehicleNumber: string;
-//     vehicleImages: string[];
-//   };
-//   veichelType: string;
-//   from: string;
-//   to: string;
-//   date: string;
-//   gotime: string;
-//   arrivaltime: string;
-//   status?: string;
-//   createdBy?: {
-//     _id: string;
-//     username: string;
-//   };
-//   requestedUsers?: any[];
-// }
-
-// export default function TravelDetail() {
-//   const { travel: travelId } = useLocalSearchParams();
-//   const { user } = useAuthStore();
-//   const [travel, setTravel] = useState<Travel | null>(null);
-//   const [loading, setLoading] = useState(true);
-
-//   const formatDate = (dateString: string) => {
-//     if (!dateString) return '';
-//     try {
-//       const date = new Date(dateString);
-//       const day = String(date.getDate()).padStart(2, '0');
-//       const month = String(date.getMonth() + 1).padStart(2, '0');
-//       const year = date.getFullYear();
-//       return `${day}/${month}/${year}`;
-//     } catch (error) {
-//       return dateString; // fallback to original if parsing fails
-//     }
-//   };
-
-//   useEffect(() => {
-//     const fetchTravel = async () => {
-//       try {
-//         const res = await fetch(`http://localhost:3000/api/travels/${travelId}`);
-//         const data = await res.json();
-//         setTravel(data);
-//       } catch (err) {
-//         console.error("Failed to fetch travel:", err);
-//         Alert.alert("Error", "Failed to load travel details");
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-//     if (travelId) fetchTravel();
-//   }, [travelId]);
-
-//   if (loading) {
-//     return (
-//       <View style={styles.loadingContainer}>
-//         <ActivityIndicator size="large" color={COLORS.primary} />
-//         <Text style={styles.loadingText}>Loading travel details...</Text>
-//       </View>
-//     );
-//   }
-
-//   if (!travel) {
-//     return (
-//       <View style={styles.errorContainer}>
-//         <Ionicons name="alert-circle-outline" size={80} color="#ccc" />
-//         <Text style={styles.errorText}>Travel not found</Text>
-//         <TouchableOpacity
-//           style={styles.backButton}
-//           onPress={() => router.back()}
-//         >
-//           <Text style={styles.backButtonText}>Go Back</Text>
-//         </TouchableOpacity>
-//       </View>
-//     );
-//   }
-
-//   const isOwner = user && travel.createdBy && travel.createdBy._id === user._id;
-//   const hasRequested = user && travel.requestedUsers && travel.requestedUsers.some((req: any) => req.userId._id === user._id);
-
-//   return (
-//     <ScrollView style={styles.container}>
-//       <View style={styles.header}>
-//         <TouchableOpacity
-//           style={styles.backButton}
-//           onPress={() => router.back()}
-//         >
-//           <Ionicons name="arrow-back" size={24} color="#fff" />
-//         </TouchableOpacity>
-//         <Text style={styles.headerTitle}>Travel Details</Text>
-//       </View>
-
-//       <View style={styles.content}>
-//         {travel.vehicleId?.vehicleImages && travel.vehicleId.vehicleImages.length > 0 ? (
-//           <View style={styles.vehicleImageContainer}>
-//             <Image source={{ uri: travel.vehicleId.vehicleImages[0] }} style={styles.vehicleImage} />
-//           </View>
-//         ) : null}
-
-//         <View style={styles.card}>
-//           <Text style={styles.vehicleType}>{travel.veichelType}</Text>
-
-//           <View style={styles.detailRow}>
-//             <Ionicons name="location-outline" size={20} color={COLORS.primary} />
-//             <View style={styles.detailContent}>
-//               <Text style={styles.detailLabel}>From</Text>
-//               <Text style={styles.detailValue}>{travel.from}</Text>
-//             </View>
-//           </View>
-
-//           <View style={styles.detailRow}>
-//             <Ionicons name="location" size={20} color={COLORS.primary} />
-//             <View style={styles.detailContent}>
-//               <Text style={styles.detailLabel}>To</Text>
-//               <Text style={styles.detailValue}>{travel.to}</Text>
-//             </View>
-//           </View>
-
-//           <View style={styles.detailRow}>
-//             <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
-//             <View style={styles.detailContent}>
-//               <Text style={styles.detailLabel}>Date</Text>
-//               <Text style={styles.detailValue}>{formatDate(travel.date)}</Text>
-//             </View>
-//           </View>
-
-//           <View style={styles.detailRow}>
-//             <Ionicons name="time-outline" size={20} color={COLORS.primary} />
-//             <View style={styles.detailContent}>
-//               <Text style={styles.detailLabel}>Departure Time</Text>
-//               <Text style={styles.detailValue}>{travel.gotime}</Text>
-//             </View>
-//           </View>
-
-//           <View style={styles.detailRow}>
-//             <Ionicons name="time" size={20} color={COLORS.primary} />
-//             <View style={styles.detailContent}>
-//               <Text style={styles.detailLabel}>Arrival Time</Text>
-//               <Text style={styles.detailValue}>{travel.arrivaltime}</Text>
-//             </View>
-//           </View>
-
-//           {travel.createdBy && (
-//             <View style={styles.detailRow}>
-//               <Ionicons name="person-outline" size={20} color={COLORS.primary} />
-//               <View style={styles.detailContent}>
-//                 <Text style={styles.detailLabel}>Created by</Text>
-//                 <Text style={styles.detailValue}>{travel.createdBy.username}</Text>
-//               </View>
-//             </View>
-//           )}
-
-//           {hasRequested && (
-//             <View style={styles.requestedBadge}>
-//               <Text style={styles.requestedBadgeText}>Request Sent</Text>
-//             </View>
-//           )}
-//         </View>
-
-//         {travel.requestedUsers && travel.requestedUsers.length > 0 && (
-//           <View style={styles.requestsSection}>
-//             <Text style={styles.sectionTitle}>Requests ({travel.requestedUsers.length})</Text>
-//             {travel.requestedUsers.map((request: any, index: number) => (
-//               <View key={index} style={styles.requestCard}>
-//                 <View style={styles.requestInfo}>
-//                   <Text style={styles.requestUser}>{request.userId.username}</Text>
-//                   <Text style={styles.requestProduct}>{request.productId?.Title || 'Product'}</Text>
-//                   <Text style={styles.requestPrice}>₹{request.price}</Text>
-//                 </View>
-//                 <TouchableOpacity
-//                   style={styles.viewButton}
-//                   onPress={() => router.push(`/proInfo/${request.productId._id}` as any)}
-//                 >
-//                   <Text style={styles.viewButtonText}>View</Text>
-//                 </TouchableOpacity>
-//               </View>
-//             ))}
-//           </View>
-//         )}
-//       </View>
-//     </ScrollView>
-//   );
-// }
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: "#f5f5f5",
-//   },
-//   loadingContainer: {
-//     flex: 1,
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     backgroundColor: "#f5f5f5",
-//   },
-//   loadingText: {
-//     marginTop: 10,
-//     fontSize: 16,
-//     color: '#666',
-//   },
-//   errorContainer: {
-//     flex: 1,
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     backgroundColor: "#f5f5f5",
-//   },
-//   errorText: {
-//     fontSize: 18,
-//     color: '#666',
-//     marginTop: 10,
-//     marginBottom: 20,
-//   },
-//   header: {
-//     backgroundColor: COLORS.primary,
-//     paddingTop: 50,
-//     paddingBottom: 20,
-//     paddingHorizontal: 20,
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//   },
-//   backButton: {
-//     padding: 8,
-//     marginRight: 16,
-//   },
-//   backButtonText: {
-//     color: COLORS.primary,
-//     fontSize: 16,
-//     fontWeight: '600',
-//   },
-//   headerTitle: {
-//     fontSize: 20,
-//     fontWeight: 'bold',
-//     color: '#fff',
-//   },
-//   content: {
-//     padding: 20,
-//   },
-//   vehicleImageContainer: {
-//     alignItems: 'center',
-//     marginBottom: 20,
-//   },
-//   vehicleImage: {
-//     width: 200,
-//     height: 150,
-//     borderRadius: 12,
-//     resizeMode: 'cover',
-//   },
-//   card: {
-//     backgroundColor: '#fff',
-//     borderRadius: 12,
-//     padding: 20,
-//     elevation: 3,
-//     shadowColor: '#000',
-//     shadowOffset: { width: 0, height: 2 },
-//     shadowOpacity: 0.1,
-//     shadowRadius: 4,
-//   },
-//   vehicleType: {
-//     fontSize: 24,
-//     fontWeight: 'bold',
-//     color: COLORS.primary,
-//     marginBottom: 20,
-//     textAlign: 'center',
-//   },
-//   detailRow: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     marginBottom: 16,
-//   },
-//   detailContent: {
-//     marginLeft: 12,
-//     flex: 1,
-//   },
-//   detailLabel: {
-//     fontSize: 12,
-//     color: '#666',
-//     fontWeight: '500',
-//   },
-//   detailValue: {
-//     fontSize: 16,
-//     color: '#333',
-//     fontWeight: '600',
-//   },
-//   requestedBadge: {
-//     backgroundColor: '#e8f5e8',
-//     paddingVertical: 8,
-//     paddingHorizontal: 16,
-//     borderRadius: 20,
-//     alignSelf: 'center',
-//     marginTop: 10,
-//   },
-//   requestedBadgeText: {
-//     color: '#4CAF50',
-//     fontSize: 14,
-//     fontWeight: '600',
-//   },
-//   requestsSection: {
-//     marginTop: 20,
-//   },
-//   sectionTitle: {
-//     fontSize: 18,
-//     fontWeight: 'bold',
-//     color: '#333',
-//     marginBottom: 12,
-//   },
-//   requestCard: {
-//     backgroundColor: '#fff',
-//     borderRadius: 8,
-//     padding: 12,
-//     marginBottom: 8,
-//     borderWidth: 1,
-//     borderColor: '#e8e8e8',
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     justifyContent: 'space-between',
-//   },
-//   requestInfo: {
-//     flex: 1,
-//   },
-//   requestUser: {
-//     fontSize: 16,
-//     fontWeight: '600',
-//     color: '#333',
-//   },
-//   requestProduct: {
-//     fontSize: 14,
-//     color: '#666',
-//     marginTop: 4,
-//   },
-//   requestPrice: {
-//     fontSize: 14,
-//     color: COLORS.primary,
-//     fontWeight: '600',
-//     marginTop: 2,
-//   },
-//   viewButton: {
-//     backgroundColor: COLORS.primary,
-//     paddingVertical: 8,
-//     paddingHorizontal: 16,
-//     borderRadius: 6,
-//   },
-//   viewButtonText: {
-//     color: '#fff',
-//     fontSize: 14,
-//     fontWeight: '600',
-//   },
-// });
-
-
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -380,7 +11,7 @@ import {
   StatusBar,
   SafeAreaView,
 } from "react-native";
-import { useLocalSearchParams, router } from "expo-router";
+import { useLocalSearchParams, router, useFocusEffect } from "expo-router";
 import { useAuthStore } from "@/store/authStore";
 import COLORS from "@/constants/color";
 import { Ionicons } from "@expo/vector-icons";
@@ -412,8 +43,7 @@ interface Travel {
 
 export default function TravelDetail() {
   const { travel: travelId } = useLocalSearchParams();
-  const { user } = useAuthStore();
-  const [travel, setTravel] = useState<Travel | null>(null);
+  const { user, token, currentTravel, fetchTravelById } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [imageIndex, setImageIndex] = useState(0);
 
@@ -443,21 +73,19 @@ export default function TravelDetail() {
     }
   };
 
-  useEffect(() => {
-    const fetchTravel = async () => {
-      try {
-        const res = await fetch(`http://localhost:3000/api/travels/${travelId}`);
-        const data = await res.json();
-        setTravel(data);
-      } catch (err) {
-        console.error("Failed to fetch travel:", err);
-        Alert.alert("Error", "Failed to load travel details");
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (travelId) fetchTravel();
-  }, [travelId]);
+  // Fetch travel data when screen is focused (including when returning from send-request page)
+  useFocusEffect(
+    useCallback(() => {
+      const loadTravel = async () => {
+        if (travelId) {
+          setLoading(true);
+          await fetchTravelById(travelId as string);
+          setLoading(false);
+        }
+      };
+      loadTravel();
+    }, [travelId, fetchTravelById])
+  );
 
   if (loading) {
     return (
@@ -471,7 +99,7 @@ export default function TravelDetail() {
     );
   }
 
-  if (!travel) {
+  if (!currentTravel) {
     return (
       <SafeAreaView style={styles.errorContainer}>
         <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
@@ -482,7 +110,7 @@ export default function TravelDetail() {
             The travel details you're looking for are not available or have been removed.
           </Text>
           <TouchableOpacity
-            style={styles.backButton}
+            style={styles.backButton1}
             onPress={() => router.back()}
           >
             <Ionicons name="arrow-back" size={20} color="#fff" />
@@ -493,9 +121,26 @@ export default function TravelDetail() {
     );
   }
 
-  const isOwner = user && travel.createdBy && travel.createdBy._id === user._id;
-  const hasRequested = user && travel.requestedUsers && travel.requestedUsers.some((req: any) => req.userId._id === user._id);
-  const vehicleImages = travel.vehicleId?.vehicleImages || [];
+  const isOwner = user && currentTravel.createdBy && currentTravel.createdBy._id === user._id;
+  console.log('🔵 isOwner:', isOwner);
+  console.log('🔵 user:', user);
+  console.log('🔵 currentTravel.createdBy:', currentTravel.createdBy);
+
+  // Get all requests made by the current user
+  const userRequests = user && currentTravel.requestedUsers
+    ? currentTravel.requestedUsers.filter((req: any) => req.userId._id === user._id)
+    : [];
+  
+  // Get IDs of products and orders already requested by the user
+  const requestedProductIds = userRequests
+    .filter((req: any) => req.productId)
+    .map((req: any) => req.productId._id || req.productId);
+  
+  const requestedOrderIds = userRequests
+    .filter((req: any) => req.orderId)
+    .map((req: any) => req.orderId._id || req.orderId);
+  
+  const vehicleImages = currentTravel.vehicleId?.vehicleImages || [];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -512,13 +157,13 @@ export default function TravelDetail() {
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Travel Details</Text>
-          <Text style={styles.headerSubtitle}>{travel.veichelType}</Text>
+          <Text style={styles.headerSubtitle}>{currentTravel.veichelType}</Text>
         </View>
         <View style={styles.headerActions}>
-          {hasRequested && (
+          {userRequests.length > 0 && (
             <View style={styles.headerBadge}>
               <Ionicons name="checkmark-circle" size={16} color="#fff" />
-              <Text style={styles.headerBadgeText}>Requested</Text>
+              <Text style={styles.headerBadgeText}>{userRequests.length} Request{userRequests.length > 1 ? 's' : ''}</Text>
             </View>
           )}
           {isOwner && (
@@ -557,7 +202,7 @@ export default function TravelDetail() {
             )}
             <View style={styles.vehicleTypeBadge}>
               <Ionicons name="car-sport" size={16} color="#fff" />
-              <Text style={styles.vehicleTypeText}>{travel.veichelType}</Text>
+              <Text style={styles.vehicleTypeText}>{currentTravel.veichelType}</Text>
             </View>
           </View>
         ) : (
@@ -581,7 +226,7 @@ export default function TravelDetail() {
               </View>
               <View style={styles.routeInfo}>
                 <Text style={styles.routeLabel}>Departure</Text>
-                <Text style={styles.routeValue}>{travel.from}</Text>
+                <Text style={styles.routeValue}>{currentTravel.from}</Text>
               </View>
             </View>
             
@@ -600,7 +245,7 @@ export default function TravelDetail() {
               </View>
               <View style={styles.routeInfo}>
                 <Text style={styles.routeLabel}>Destination</Text>
-                <Text style={styles.routeValue}>{travel.to}</Text>
+                <Text style={styles.routeValue}>{currentTravel.to}</Text>
               </View>
             </View>
           </View>
@@ -620,7 +265,7 @@ export default function TravelDetail() {
               </View>
               <View style={styles.scheduleContent}>
                 <Text style={styles.scheduleLabel}>Date</Text>
-                <Text style={styles.scheduleValue}>{formatDate(travel.date)}</Text>
+                <Text style={styles.scheduleValue}>{formatDate(currentTravel.date)}</Text>
               </View>
             </View>
             
@@ -630,7 +275,7 @@ export default function TravelDetail() {
               </View>
               <View style={styles.scheduleContent}>
                 <Text style={styles.scheduleLabel}>Departure</Text>
-                <Text style={styles.scheduleValue}>{formatTime(travel.gotime)}</Text>
+                <Text style={styles.scheduleValue}>{formatTime(currentTravel.gotime)}</Text>
               </View>
             </View>
             
@@ -640,7 +285,7 @@ export default function TravelDetail() {
               </View>
               <View style={styles.scheduleContent}>
                 <Text style={styles.scheduleLabel}>Arrival</Text>
-                <Text style={styles.scheduleValue}>{formatTime(travel.arrivaltime)}</Text>
+                <Text style={styles.scheduleValue}>{formatTime(currentTravel.arrivaltime)}</Text>
               </View>
             </View>
             
@@ -651,7 +296,7 @@ export default function TravelDetail() {
               <View style={styles.scheduleContent}>
                 <Text style={styles.scheduleLabel}>Status</Text>
                 <Text style={[styles.scheduleValue, styles.statusActive]}>
-                  {travel.status || 'Active'}
+                  {currentTravel.status || 'Active'}
                 </Text>
               </View>
             </View>
@@ -659,7 +304,7 @@ export default function TravelDetail() {
         </View>
 
         {/* Host Card */}
-        {travel.createdBy && (
+        {currentTravel.createdBy && (
           <View style={styles.hostCard}>
             <View style={styles.hostHeader}>
               <Ionicons name="person-circle-outline" size={24} color={COLORS.primary} />
@@ -669,15 +314,15 @@ export default function TravelDetail() {
             <View style={styles.hostInfo}>
               <View style={styles.hostAvatar}>
                 <Text style={styles.hostAvatarText}>
-                  {travel.createdBy.username.charAt(0).toUpperCase()}
+                  {currentTravel.createdBy.username.charAt(0).toUpperCase()}
                 </Text>
               </View>
               <View style={styles.hostDetails}>
-                <Text style={styles.hostName}>{travel.createdBy.username}</Text>
-                {travel.createdBy.phone && (
+                <Text style={styles.hostName}>{currentTravel.createdBy.username}</Text>
+                {currentTravel.createdBy.phone && (
                   <View style={styles.hostContact}>
                     <Ionicons name="call-outline" size={14} color="#666" />
-                    <Text style={styles.hostPhone}>{travel.createdBy.phone}</Text>
+                    <Text style={styles.hostPhone}>{currentTravel.createdBy.phone}</Text>
                   </View>
                 )}
               </View>
@@ -696,7 +341,7 @@ export default function TravelDetail() {
         )}
 
         {/* Vehicle Info Card */}
-        {travel.vehicleId && (
+        {currentTravel.vehicleId && (
           <View style={styles.vehicleCard}>
             <View style={styles.vehicleHeader}>
               <Ionicons name="car-outline" size={24} color={COLORS.primary} />
@@ -706,12 +351,12 @@ export default function TravelDetail() {
             <View style={styles.vehicleInfo}>
               <View style={styles.vehicleDetail}>
                 <Text style={styles.vehicleLabel}>Vehicle Type</Text>
-                <Text style={styles.vehicleValue}>{travel.vehicleId.vehicleType}</Text>
+                <Text style={styles.vehicleValue}>{currentTravel.vehicleId.vehicleType}</Text>
               </View>
               
               <View style={styles.vehicleDetail}>
                 <Text style={styles.vehicleLabel}>Vehicle Number</Text>
-                <Text style={styles.vehicleValue}>{travel.vehicleId.vehicleNumber}</Text>
+                <Text style={styles.vehicleValue}>{currentTravel.vehicleId.vehicleNumber}</Text>
               </View>
               
               <View style={styles.vehicleDetail}>
@@ -723,19 +368,25 @@ export default function TravelDetail() {
         )}
 
         {/* Requests Section */}
-        {travel.requestedUsers && travel.requestedUsers.length > 0 && (
+        {currentTravel.requestedUsers && currentTravel.requestedUsers.length > 0 && (
           <View style={styles.requestsSection}>
             <View style={styles.requestsHeader}>
               <Ionicons name="cube-outline" size={24} color={COLORS.primary} />
               <Text style={styles.requestsTitle}>
-                Delivery Requests ({travel.requestedUsers.length})
+                Delivery Requests ({currentTravel.requestedUsers.length})
               </Text>
               <View style={styles.requestsBadge}>
-                <Text style={styles.requestsBadgeText}>{travel.requestedUsers.length}</Text>
+                <Text style={styles.requestsBadgeText}>{currentTravel.requestedUsers.length}</Text>
               </View>
             </View>
             
-            {travel.requestedUsers.map((request: any, index: number) => (
+            {currentTravel.requestedUsers.map((request: any, index: number) => {
+              console.log(`🔵 Request ${index}:`, request);
+              console.log(`🔵 Request ${index} status:`, request.status);
+              console.log(`🔵 Request ${index} type:`, request.requestType);
+              console.log(`🔵 Request ${index} should show accept button:`, isOwner && request.status === 'pending');
+
+              return (
               <View key={index} style={styles.requestCard}>
                 <View style={styles.requestInfo}>
                   <View style={styles.requestUserInfo}>
@@ -746,7 +397,14 @@ export default function TravelDetail() {
                     </View>
                     <View>
                       <Text style={styles.requestUserName}>{request.userId.username}</Text>
-                      <Text style={styles.requestProduct}>{request.productId?.Title || 'Product'}</Text>
+                      <Text style={styles.requestProduct}>
+                        {request.requestType === 'product'
+                          ? request.productId?.Title || 'Product'
+                          : request.orderId?.orderId || 'Order'}
+                      </Text>
+                      <Text style={styles.requestMeta}>
+                        {request.fromUserId?.username} → {request.toUserId?.username}
+                      </Text>
                     </View>
                   </View>
                   <View style={styles.requestPriceContainer}>
@@ -754,21 +412,122 @@ export default function TravelDetail() {
                     <Text style={styles.requestPrice}>₹{request.price}</Text>
                   </View>
                 </View>
-                <TouchableOpacity
-                  style={styles.viewButton}
-                  onPress={() => router.push(`/proInfo/${request.productId._id}` as any)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.viewButtonText}>View Product</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#fff" />
-                </TouchableOpacity>
+                <View style={styles.requestActions}>
+                  {isOwner && request.status === 'pending' && (
+                    <TouchableOpacity
+                      style={styles.acceptButton}
+                      onPress={async () => {
+                        if (request.requestType === 'product' && request.productId) {
+                          router.push({
+                            pathname: `/proInfo/${request.productId._id}` as any,
+                            params: {
+                              travelId: travelId as string,
+                              requestId: request._id,
+                              mode: 'accept'
+                            }
+                          } as any);
+                        } else if (request.requestType === 'order' && request.orderId) {
+                          // Accept the order request by calling the backend API
+                          try {
+                            console.log('🔵 Accept button clicked for order request');
+                            console.log('🔵 Request data:', request);
+                            console.log('🔵 User:', user);
+                            console.log('🔵 Token:', token ? 'present' : 'missing');
+
+                            if (!token) {
+                              Alert.alert('Error', 'Authentication required');
+                              return;
+                            }
+
+                            const orderId = request.orderId._id || request.orderId;
+                            console.log('🔵 Order ID:', orderId);
+                            console.log('🔵 Travel ID:', travelId);
+
+                            const requestBody = {
+                              userId: user._id,
+                              orderId: orderId,
+                              vehicleType: currentTravel.vehicleId?.vehicleType || currentTravel.veichelType,
+                              tentativeTime: currentTravel.arrivaltime,
+                              price: request.price,
+                            };
+                            console.log('🔵 Request body:', requestBody);
+
+                            const apiUrl = `http://localhost:3000/api/travels/${travelId}/accept-request`;
+                            console.log('🔵 API URL:', apiUrl);
+
+                            const res = await fetch(apiUrl, {
+                              method: 'PATCH',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`,
+                              },
+                              body: JSON.stringify(requestBody),
+                            });
+
+                            console.log('🔵 Response status:', res.status);
+                            const data = await res.json();
+                            console.log('🔵 Response data:', data);
+
+                            if (!res.ok) {
+                              throw new Error(data.message || 'Failed to accept request');
+                            }
+
+                            Alert.alert('Success', 'Order request accepted successfully!');
+                            // Refresh travel data
+                            await fetchTravelById(travelId as string);
+                          } catch (error: any) {
+                            console.error('❌ Error accepting order request:', error);
+                            Alert.alert('Error', error.message || 'Failed to accept request');
+                          }
+                        }
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                      <Text style={styles.acceptButtonText}>Accept</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={styles.viewButton}
+                    onPress={() => {
+                      if (request.requestType === 'product' && request.productId) {
+                        router.push(`/proInfo/${request.productId._id}` as any);
+                      } else if (request.requestType === 'order' && request.orderId) {
+                        router.push(`/orderInfo/${request.orderId._id}` as any);
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.viewButtonText}>
+                      {request.requestType === 'product' ? 'View Product' : 'View Order'}
+                    </Text>
+                    <Ionicons name="arrow-forward" size={16} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               </View>
-            ))}
+              );
+            })}
+          </View>
+        )}
+
+        {/* Send Request Button */}
+        {!isOwner && (
+          <View style={styles.sendRequestContainer}>
+            <TouchableOpacity
+              style={styles.sendRequestButton}
+              onPress={() => router.push(`/send-request/${travelId}` as any)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="send" size={20} color="#fff" />
+              <Text style={styles.sendRequestButtonText}>
+                {userRequests.length > 0 ? 'Send Another Request' : 'Send Delivery Request'}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
         {/* Empty State for No Requests */}
-        {(!travel.requestedUsers || travel.requestedUsers.length === 0) && (
+        {(!currentTravel.requestedUsers || currentTravel.requestedUsers.length === 0) && (
           <View style={styles.noRequestsContainer}>
             <Ionicons name="cube-outline" size={60} color="#E0E0E0" />
             <Text style={styles.noRequestsTitle}>No Delivery Requests Yet</Text>
@@ -777,6 +536,19 @@ export default function TravelDetail() {
                 ? "Your travel hasn't received any delivery requests yet."
                 : "Be the first to send a delivery request for this travel."
               }
+            </Text>
+          </View>
+        )}
+
+        {/* User's Requests Summary */}
+        {userRequests.length > 0 && (
+          <View style={styles.userRequestsSummary}>
+            <View style={styles.userRequestsSummaryHeader}>
+              <Ionicons name="list-circle-outline" size={20} color={COLORS.primary} />
+              <Text style={styles.userRequestsSummaryTitle}>Your Requests ({userRequests.length})</Text>
+            </View>
+            <Text style={styles.userRequestsSummaryText}>
+              You can send more requests for different products or orders.
             </Text>
           </View>
         )}
@@ -1317,6 +1089,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  requestMeta: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
   requestPriceContainer: {
     alignItems: 'flex-end',
   },
@@ -1344,6 +1121,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginRight: 8,
   },
+  requestActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  acceptButton: {
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    flex: 1,
+  },
+  acceptButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    marginLeft: 6,
+  },
   noRequestsContainer: {
     alignItems: 'center',
     padding: 40,
@@ -1364,6 +1161,58 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  userRequestsSummary: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
+  },
+  userRequestsSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  userRequestsSummaryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1565C0',
+    marginLeft: 8,
+  },
+  userRequestsSummaryText: {
+    fontSize: 14,
+    color: '#555',
+    lineHeight: 20,
+  },
+  sendRequestContainer: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  sendRequestButton: {
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  sendRequestButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+    marginLeft: 12,
+    letterSpacing: 0.5,
   },
   backButton1: {
     backgroundColor: COLORS.primary,

@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, ScrollView, Image, ActivityIndicator, Alert, TouchableOpacity, Modal, TextInput } from 'react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 import COLORS from '@/constants/color';
@@ -49,6 +49,7 @@ export default function Profile() {
   const [zipCode, setZipCode] = useState('');
   const [isDefault, setIsDefault] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
+  const [coordinates, setCoordinates] = useState({ lat: 16.706369, lng: 74.2481772 });
 
   useEffect(() => {
     fetchData();
@@ -159,12 +160,41 @@ export default function Profile() {
 
     setSavingAddress(true);
     try {
+      // Use free geocoding service (Nominatim) to get coordinates from address
+      let lat = coordinates.lat;
+      let lng = coordinates.lng;
+
+      try {
+        const fullAddress = `${address.trim()}, ${city.trim()}, ${state.trim()} ${zipCode.trim()}`;
+        const geocodingResponse = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1`,
+          {
+            headers: {
+              'User-Agent': 'OrderTracker/1.0',
+            },
+          }
+        );
+
+        if (geocodingResponse.ok) {
+          const geocodingData = await geocodingResponse.json();
+          if (geocodingData && geocodingData.length > 0) {
+            lat = parseFloat(geocodingData[0].lat);
+            lng = parseFloat(geocodingData[0].lon);
+          }
+        }
+      } catch (geocodingError) {
+        console.warn('Geocoding failed, using default coordinates:', geocodingError);
+        // Fall back to default coordinates if geocoding fails
+      }
+
       const addressData = {
         label: addressLabel,
         address: address.trim(),
         city: city.trim(),
         state: state.trim(),
         zipCode: zipCode.trim(),
+        lat,
+        lng,
         isDefault,
       };
 
@@ -443,35 +473,38 @@ export default function Profile() {
                 ))}
               </View>
 
+              {/* Manual Address Input */}
+              <Text style={styles.inputLabel}>Street Address</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Street Address"
+                style={styles.input}
+                placeholder="Enter your street address"
                 value={address}
                 onChangeText={setAddress}
-                multiline
-                numberOfLines={3}
                 placeholderTextColor="#999"
               />
 
+              <Text style={styles.inputLabel}>City</Text>
               <TextInput
                 style={styles.input}
-                placeholder="City"
+                placeholder="Enter your city"
                 value={city}
                 onChangeText={setCity}
                 placeholderTextColor="#999"
               />
 
+              <Text style={styles.inputLabel}>State</Text>
               <TextInput
                 style={styles.input}
-                placeholder="State"
+                placeholder="Enter your state"
                 value={state}
                 onChangeText={setState}
                 placeholderTextColor="#999"
               />
 
+              <Text style={styles.inputLabel}>ZIP Code</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Zip Code"
+                placeholder="Enter your ZIP code"
                 value={zipCode}
                 onChangeText={setZipCode}
                 keyboardType="numeric"

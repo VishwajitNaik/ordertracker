@@ -22,11 +22,23 @@ import { useLocalSearchParams } from "expo-router";
 import { useAuthStore } from "@/store/authStore";
 import { launchImageLibrary } from 'react-native-image-picker';
 
+interface Address {
+  _id: string;
+  label: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  lat: number;
+  lng: number;
+  isDefault: boolean;
+}
+
 interface Shop {
   _id: string;
   name: string;
   shopType: string;
-  location: string;
+  location: Address;
   images: string[];
   openingTime: string;
   closingTime: string;
@@ -337,7 +349,7 @@ export default function Shops() {
 
         <View style={styles.card}>
           <Text style={styles.label}>
-            📍 Location: <Text style={styles.value}>{shop.location}</Text>
+            📍 Location: <Text style={styles.value}>{shop.location && shop.location.address ? `${shop.location.address}, ${shop.location.city}` : 'N/A'}</Text>
           </Text>
           <Text style={styles.label}>
             🕒 Opening Time: <Text style={styles.value}>{shop.openingTime}</Text>

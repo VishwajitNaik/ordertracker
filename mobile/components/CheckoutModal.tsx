@@ -42,6 +42,12 @@ interface CheckoutModalProps {
   singleItem?: any;
   totalAmount?: number;
   shopId?: string;
+  // Bid confirmation specific properties
+  isBidConfirmation?: boolean;
+  bidAmount?: number;
+  productId?: string;
+  acceptedUserId?: string;
+  onBidConfirm?: (paymentData: any) => Promise<void>;
 }
 
 interface Address {
@@ -60,17 +66,29 @@ interface DeliveryOption {
   description: string;
 }
 
-export default function CheckoutModal({ visible, onClose, cartItems, singleItem, totalAmount, shopId }: CheckoutModalProps) {
-  const { user, token } = useAuthStore();
+export default function CheckoutModal({ 
+  visible, 
+  onClose, 
+  cartItems, 
+  singleItem, 
+  totalAmount, 
+  shopId,
+  isBidConfirmation = false,
+  bidAmount = 0,
+  productId,
+  acceptedUserId,
+  onBidConfirm
+}: CheckoutModalProps) {
+  const { user, token, wallet } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
   const [shopInfo, setShopInfo] = useState<any>(null);
 
-  // Determine checkout items and total
-  const checkoutItems = singleItem ? [{ subItemId: singleItem, quantity: 1, price: singleItem.Price }] : (cartItems || []);
-  const checkoutTotal = singleItem ? singleItem.Price : (totalAmount || 0);
-  const checkoutShopId = singleItem ? singleItem.parentItemId?.shop_id : shopId;
+  // Determine checkout items and total based on type
+  const checkoutItems = isBidConfirmation ? [] : (singleItem ? [{ subItemId: singleItem, quantity: 1, price: singleItem.Price }] : (cartItems || []));
+  const checkoutTotal = isBidConfirmation ? bidAmount : (singleItem ? singleItem.Price : (totalAmount || 0));
+  const checkoutShopId = isBidConfirmation ? null : (singleItem ? singleItem.parentItemId?.shop_id : shopId);
 
   // Form state
   const [selectedAddressId, setSelectedAddressId] = useState<string>('');
@@ -83,6 +101,7 @@ export default function CheckoutModal({ visible, onClose, cartItems, singleItem,
   });
   const [useCustomAddress, setUseCustomAddress] = useState(false);
   const [notes, setNotes] = useState('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('razorpay');
 
   useEffect(() => {
     if (visible && user && token) {
@@ -145,27 +164,78 @@ export default function CheckoutModal({ visible, onClose, cartItems, singleItem,
   };
 
   const handlePayment = async () => {
-    if (!selectedAddressId && !useCustomAddress) {
-      Alert.alert('Error', 'Please select a delivery address');
-      return;
-    }
+    if (!isBidConfirmation) {
+      // Regular checkout validation
+      if (!selectedAddressId && !useCustomAddress) {
+        Alert.alert('Error', 'Please select a delivery address');
+        return;
+      }
 
-    if (useCustomAddress && (!customAddress.address || !customAddress.city || !customAddress.state || !customAddress.zipCode)) {
-      Alert.alert('Error', 'Please fill in all custom address fields');
-      return;
+      if (useCustomAddress && (!customAddress.address || !customAddress.city || !customAddress.state || !customAddress.zipCode)) {
+        Alert.alert('Error', 'Please fill in all custom address fields');
+        return;
+      }
     }
-
 
     setLoading(true);
     try {
-      // Create Razorpay order
+      // Handle wallet payment separately
+      if (selectedPaymentMethod === 'wallet') {
+        // Check if user has sufficient balance
+        if (!wallet || wallet.availableBalance < checkoutTotal) {
+          Alert.alert('Error', 'Insufficient wallet balance');
+          setLoading(false);
+          return;
+        }
+
+        if (isBidConfirmation) {
+          // Bid confirmation with wallet
+          if (onBidConfirm && productId && acceptedUserId) {
+            await onBidConfirm({
+              paymentMethod: 'wallet',
+              useWallet: true,
+              walletAmount: Math.min(bidAmount, wallet.availableBalance)
+            });
+          } else if (productId && acceptedUserId) {
+            // Use the auth store's confirmBid function with wallet payment data
+            const confirmBid = useAuthStore.getState().confirmBid;
+            await confirmBid(productId, acceptedUserId, {
+              paymentMethod: 'wallet',
+              useWallet: true,
+              walletAmount: Math.min(bidAmount, wallet.availableBalance)
+            });
+          }
+          Alert.alert(
+            'Success',
+            'Payment successful! Bid confirmed.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  onClose();
+                }
+              }
+            ]
+          );
+        } else {
+          // Regular checkout with wallet
+          Alert.alert('Success', 'Wallet payment successful! Order placed.');
+          onClose();
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Create Razorpay order for other payment methods
+      // Ensure we're passing amount in rupees (not paisa) to backend as integer
+      const orderAmount = isBidConfirmation ? Math.floor(bidAmount) : Math.floor(calculateFinalAmount());
       const orderResponse = await fetch('http://localhost:3000/api/checkout/create-order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ amount: calculateFinalAmount() }),
+        body: JSON.stringify({ amount: orderAmount }),
       });
 
       const orderData = await orderResponse.json();
@@ -187,47 +257,80 @@ export default function CheckoutModal({ visible, onClose, cartItems, singleItem,
           name: user.username,
         },
         theme: { color: '#007AFF' },
+        // Enable multiple payment methods
+        method: ['card', 'netbanking', 'upi', 'wallet'],
       };
 
       // Show mock payment notice
       Alert.alert(
         'Mock Payment',
-        'Using test payment system. In production, this will open Razorpay.',
+        'Using test payment system. In production, this will open Razorpay with multiple payment options.',
         [{ text: 'Continue' }]
       );
 
       // Open mock Razorpay checkout
       const paymentResponse = await RazorpayCheckout.open(options);
 
-      // Verify payment
-      const verifyResponse = await fetch('http://localhost:3000/api/checkout/verify-payment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          razorpay_order_id: paymentResponse.razorpay_order_id,
-          razorpay_payment_id: paymentResponse.razorpay_payment_id,
-          razorpay_signature: paymentResponse.razorpay_signature,
-          orderData: {
-            deliveryType: selectedDeliveryType,
-            deliveryAddressId: useCustomAddress ? null : selectedAddressId,
-            customAddress: useCustomAddress ? customAddress : null,
-            shopId: checkoutShopId,
-            offers: [], // Dummy offers
-            notes,
-          },
-        }),
-      });
-
-      const verifyData = await verifyResponse.json();
-      if (verifyResponse.ok) {
-        Alert.alert('Success', `Order placed successfully! Order ID: ${verifyData.orderId}`);
-        onClose();
-        // Refresh cart or navigate to orders
+      if (isBidConfirmation) {
+        // Bid confirmation flow
+        if (onBidConfirm && productId && acceptedUserId) {
+          await onBidConfirm({
+            ...paymentResponse,
+            paymentMethod: selectedPaymentMethod
+          });
+        } else if (productId && acceptedUserId) {
+          // Use the auth store's confirmBid function with payment data
+          const confirmBid = useAuthStore.getState().confirmBid;
+          await confirmBid(productId, acceptedUserId, {
+            ...paymentResponse,
+            paymentMethod: selectedPaymentMethod
+          });
+        }
+        Alert.alert(
+          'Success',
+          'Payment successful! Bid confirmed.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                onClose();
+              }
+            }
+          ]
+        );
       } else {
-        Alert.alert('Error', verifyData.message);
+        // Regular checkout flow
+        // Verify payment
+        const verifyResponse = await fetch('http://localhost:3000/api/checkout/verify-payment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            razorpay_order_id: paymentResponse.razorpay_order_id,
+            razorpay_payment_id: paymentResponse.razorpay_payment_id,
+            razorpay_signature: paymentResponse.razorpay_signature,
+            orderData: {
+              deliveryType: selectedDeliveryType,
+              deliveryAddressId: useCustomAddress ? null : selectedAddressId,
+              customAddress: useCustomAddress ? customAddress : null,
+              shopId: checkoutShopId,
+              offers: [], // Dummy offers
+              notes,
+              paymentMethod: selectedPaymentMethod,
+            },
+          }),
+        });
+
+        const verifyData = await verifyResponse.json();
+        if (verifyResponse.ok) {
+          Alert.alert('Success', `Order placed successfully! Order ID: ${verifyData.orderId}`);
+          onClose();
+          // Refresh cart or navigate to orders
+        } else {
+          Alert.alert('Error', verifyData.message);
+        }
       }
 
     } catch (error: any) {
@@ -241,32 +344,49 @@ export default function CheckoutModal({ visible, onClose, cartItems, singleItem,
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.modal}>
           <View style={styles.header}>
-            <Text style={styles.title}>Checkout</Text>
+            <Text style={styles.title}>{isBidConfirmation ? 'Confirm Bid Payment' : 'Checkout'}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            {/* Shop Information */}
-            {shopInfo && (
+            {/* Bid Confirmation Specific Content */}
+            {isBidConfirmation && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Shop Information</Text>
-                <View style={styles.shopInfoContainer}>
-                  <Text style={styles.shopInfoTitle}>Product from:</Text>
-                  <Text style={styles.shopInfoText}>{shopInfo.name}</Text>
-                  <Text style={styles.shopInfoAddress}>{shopInfo.location}</Text>
+                <Text style={styles.sectionTitle}>Bid Confirmation</Text>
+                <View style={styles.bidInfoContainer}>
+                  <Text style={styles.bidInfoText}>You are about to confirm the bid and make payment.</Text>
+                  <View style={styles.bidAmountContainer}>
+                    <Text style={styles.bidAmountLabel}>Bid Amount:</Text>
+                    <Text style={styles.bidAmountValue}>₹{bidAmount}</Text>
+                  </View>
                 </View>
               </View>
             )}
 
-            {/* Delivery Address Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Select Delivery Address</Text>
+            {/* Regular Checkout Content */}
+            {!isBidConfirmation && (
+              <View>
+                {/* Shop Information */}
+                {shopInfo && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Shop Information</Text>
+                    <View style={styles.shopInfoContainer}>
+                      <Text style={styles.shopInfoTitle}>Product from:</Text>
+                      <Text style={styles.shopInfoText}>{shopInfo.name}</Text>
+                      <Text style={styles.shopInfoAddress}>{shopInfo.location}</Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Delivery Address Section */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Select Delivery Address</Text>
 
               {/* Saved Addresses */}
               {addresses.map((address) => (
@@ -388,6 +508,63 @@ export default function CheckoutModal({ visible, onClose, cartItems, singleItem,
               </View>
             </View>
 
+            {/* Payment Method Selection */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Payment Method</Text>
+              <View style={styles.paymentMethodContainer}>
+                 {[
+                  { key: 'phonepe', label: 'PhonePe', icon: 'phone-portrait-outline' },
+                  { key: 'googlepay', label: 'Google Pay', icon: 'logo-google' },
+                  { key: 'netbanking', label: 'Net Banking', icon: 'desktop-outline' },
+                  { key: 'upi', label: 'UPI', icon: 'qr-code-outline' },
+                  { key: 'razorpay', label: 'Credit/Debit Card', icon: 'card-outline' },
+                  { 
+                    key: 'wallet', 
+                    label: 'Wallet', 
+                    icon: 'wallet-outline',
+                    subtitle: wallet ? `Balance: ₹${wallet.availableBalance.toFixed(2)}` : 'Balance: ₹0.00',
+                    disabled: !wallet || wallet.availableBalance < checkoutTotal
+                  },
+                ].map((method) => (
+                  <TouchableOpacity
+                    key={method.key}
+                    style={[
+                      styles.paymentMethodOption,
+                      selectedPaymentMethod === method.key && styles.selectedPaymentMethod,
+                      method.disabled && styles.disabledPaymentMethod
+                    ]}
+                    onPress={() => !method.disabled && setSelectedPaymentMethod(method.key)}
+                    disabled={method.disabled}
+                  >
+                    <Ionicons 
+                      name={method.icon as any} 
+                      size={20} 
+                      color={method.disabled ? "#ccc" : "#007AFF"} 
+                    />
+                    <View style={styles.paymentMethodInfo}>
+                      <Text style={[
+                        styles.paymentMethodLabel,
+                        method.disabled && styles.disabledText
+                      ]}>
+                        {method.label}
+                      </Text>
+                      {method.subtitle && (
+                        <Text style={[
+                          styles.paymentMethodSubtitle,
+                          method.disabled && styles.disabledText
+                        ]}>
+                          {method.subtitle}
+                        </Text>
+                      )}
+                    </View>
+                    {selectedPaymentMethod === method.key && (
+                      <Ionicons name="checkmark-circle" size={20} color="#007AFF" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
             {/* Notes */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Special Instructions (Optional)</Text>
@@ -400,6 +577,8 @@ export default function CheckoutModal({ visible, onClose, cartItems, singleItem,
                 numberOfLines={3}
               />
             </View>
+              </View>
+          )}
           </ScrollView>
 
           {/* Footer */}
@@ -423,7 +602,7 @@ export default function CheckoutModal({ visible, onClose, cartItems, singleItem,
                 <>
                   <Ionicons name="card-outline" size={18} color="#fff" />
                   <Text style={styles.payButtonText}>
-                    Pay ₹{calculateFinalAmount()}
+                    {isBidConfirmation ? `Pay ₹${bidAmount}` : `Pay ₹${calculateFinalAmount()}`}
                   </Text>
                 </>
               )}
@@ -440,6 +619,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+  },
+  bidInfoContainer: {
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 12,
+  },
+  bidInfoText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  bidAmountContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E8E8E8',
+  },
+  bidAmountLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  bidAmountValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#007AFF',
   },
   modal: {
     backgroundColor: '#fff',
@@ -652,5 +860,47 @@ const styles = StyleSheet.create({
   shopInfoAddress: {
     fontSize: 14,
     color: '#666',
+  },
+  paymentMethodInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  paymentMethodSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  disabledPaymentMethod: {
+    opacity: 0.5,
+  },
+  disabledText: {
+    color: '#ccc',
+  },
+  paymentMethodContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  paymentMethodOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    borderRadius: 8,
+    flex: 1,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+  },
+  selectedPaymentMethod: {
+    borderColor: '#007AFF',
+    backgroundColor: '#F0F8FF',
+  },
+  paymentMethodLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1A1A1A',
+    marginLeft: 8,
   },
 });

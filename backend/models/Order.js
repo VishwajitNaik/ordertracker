@@ -49,7 +49,7 @@ const orderSchema = new mongoose.Schema({
     },
     deliveryType: {
         type: String,
-        enum: ['shop_delivery', 'own_delivery'],
+        enum: ['shop_delivery', 'own_delivery', 'product_delivery'],
         required: true
     },
     deliveryAddress: {
@@ -75,6 +75,19 @@ const orderSchema = new mongoose.Schema({
         enum: ['pending', 'completed', 'failed', 'refunded'],
         default: 'pending'
     },
+    paymentDetails: {
+        razorpay_order_id: String,
+        razorpay_payment_id: String,
+        razorpay_signature: String,
+        paymentMethod: {
+            type: String,
+            enum: ['razorpay', 'upi', 'netbanking', 'phonepe', 'googlepay', 'wallet'],
+            default: 'razorpay'
+        },
+        paymentDate: Date,
+        transactionId: String,
+        paidAmount: Number
+    },
     orderStatus: {
         type: String,
         enum: ['placed', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'],
@@ -82,8 +95,13 @@ const orderSchema = new mongoose.Schema({
     },
     deliveryStatus: {
         type: String,
-        enum: ['accepted', 'in-transit', 'delivered', 'cancelled'],
-        default: null
+        enum: ['pending','accepted', 'in-transit', 'delivered', 'cancelled'],
+        default: 'pending'
+    },
+    liveLocation: {
+        lat: Number,
+        lng: Number,
+        updatedAt: Date,
     },
     acceptedUsers: [{
         userId: {
@@ -107,6 +125,36 @@ const orderSchema = new mongoose.Schema({
             type: String,
             enum: ['accepted', 'in-transit', 'delivered', 'cancelled'],
             default: 'accepted'
+        },
+        deliveryDetails: {
+            deliveryBoyId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+            },
+            deliveryStatus: {
+                type: String,
+                enum: ['pending', 'in-transit', 'delivered', 'failed'],
+                default: 'pending',
+            },
+            currentLocation: {
+                lat: Number,
+                lng: Number,
+                timestamp: Date,
+            },
+            deliveryImage: String,
+            deliveryImageWithBarcode: String,
+            recipientMobile: String,
+            otpCode: String,
+            otpVerified: {
+                type: Boolean,
+                default: false,
+            },
+            deliveredAt: Date,
+            barcodeScanned: {
+                type: Boolean,
+                default: false,
+            },
+            barcodeData: String,
         },
         messages: [{
             senderId: {

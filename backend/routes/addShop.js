@@ -1,6 +1,7 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import Shop from '../models/shop.js';
+import { Address } from '../models/UserDetails.js';
 import protectRoute from '../src/middleware/authMiddleware.js';
 import multer from 'multer';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
@@ -36,6 +37,22 @@ router.post('/shop', protectRoute, uploadFields, async (req, res) => {
         // Validate required fields
         if (!name || !shopType || !location || !openingTime || !closingTime) {
             return res.status(400).json({ message: 'Please provide all required fields' });
+        }
+
+        // Validate that location is a valid ObjectId reference
+        if (!mongoose.Types.ObjectId.isValid(location)) {
+            return res.status(400).json({ message: 'Invalid address reference' });
+        }
+
+        // Verify that the address exists and belongs to the user
+        const address = await Address.findById(location);
+
+        if (!address) {
+            return res.status(400).json({ message: 'Invalid address reference' });
+        }
+
+        if (address.createdBy.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'You can only use your own addresses' });
         }
 
         // Get uploaded image URLs
@@ -76,7 +93,7 @@ router.post('/shop', protectRoute, uploadFields, async (req, res) => {
 
 router.get('/', protectRoute, async (req, res) => {
     try {
-        const shops = await Shop.find({ owner: req.user._id }).populate('owner', 'username email'); // Filter by owner and populate owner details
+        const shops = await Shop.find({ owner: req.user._id }).populate('owner', 'username email').populate('location'); // Filter by owner and populate owner and location details
         res.status(200).json(shops);
     } catch (error) {
         console.error('Error fetching shops:', error);
@@ -86,7 +103,7 @@ router.get('/', protectRoute, async (req, res) => {
 
 router.get('/getAllUserSide', async (req, res) => {
     try {
-        const shops = await Shop.find().sort({ createdAt: -1 }).populate('owner', 'username email'); // Sort by creation date descending
+        const shops = await Shop.find().sort({ createdAt: -1 }).populate('owner', 'username email').populate('location'); // Sort by creation date descending
         res.status(200).json(shops);
     } catch (error) {
         console.error('Error fetching shops:', error);
@@ -108,6 +125,7 @@ router.get('/all', async (req, res) => {
         const shops = await Shop.find()
             .sort({ createdAt: -1 })
             .populate('owner', 'username email')
+            .populate('location')
             .skip(skip)
             .limit(limit);
 
@@ -134,9 +152,9 @@ router.get('/:id', async (req, res) => {
         const identifier = decodeURIComponent(req.params.id);
         let shop;
         if (mongoose.Types.ObjectId.isValid(identifier)) {
-            shop = await Shop.findById(identifier).populate('owner', 'username email');
+            shop = await Shop.findById(identifier).populate('owner', 'username email').populate('location');
         } else {
-            shop = await Shop.findOne({ name: identifier }).populate('owner', 'username email');
+            shop = await Shop.findOne({ name: identifier }).populate('owner', 'username email').populate('location');
         }
         if (!shop) {
             return res.status(404).json({ message: 'Shop not found' });

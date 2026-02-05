@@ -50,12 +50,63 @@ router.get('/addresses/:userId', protectRoute, async (req, res) => {
     }
 });
 
+// Get single address by ID (Public endpoint - no authentication required)
+router.get('/addresses/public/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Find the address by ID
+        const address = await Address.findById(id);
+        if (!address) {
+            return res.status(404).json({ message: 'Address not found' });
+        }
+
+        // Return address details without authentication check
+        res.status(200).json(address);
+    } catch (error) {
+        console.error('Error fetching address:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Get single address by ID (Authenticated endpoint - for user's own addresses)
+router.get('/addresses/single/:id', protectRoute, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Find the address by ID
+        const address = await Address.findById(id);
+        if (!address) {
+            return res.status(404).json({ message: 'Address not found' });
+        }
+
+        // Allow users to view their own addresses or admins to view any
+        if (req.user._id.toString() !== address.createdBy.toString() && !req.user.isAdmin) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
+        res.status(200).json(address);
+    } catch (error) {
+        console.error('Error fetching address:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 router.post('/addresses', protectRoute, async (req, res) => {
     try {
-        const { label, address, city, state, zipCode, isDefault } = req.body;
+        console.log('Address creation request received:', req.body);
+        const { label, address, city, state, zipCode, isDefault, lat, lng } = req.body;
+
+        console.log('Parsed body:', { label, address, city, state, zipCode, isDefault, lat, lng });
 
         if (!address || !city || !state || !zipCode) {
+            console.log('Validation failed: missing required fields');
             return res.status(400).json({ message: 'Address, city, state, and zip code are required' });
+        }
+
+        if (lat === undefined || lng === undefined) {
+            console.log('Validation failed: missing coordinates');
+            return res.status(400).json({ message: 'Latitude and longitude are required' });
         }
 
         // If setting as default, unset other defaults for this user
@@ -72,6 +123,8 @@ router.post('/addresses', protectRoute, async (req, res) => {
             city,
             state,
             zipCode,
+            lat,
+            lng,
             isDefault: isDefault || false,
             createdBy: req.user._id
         });
@@ -88,7 +141,7 @@ router.post('/addresses', protectRoute, async (req, res) => {
 router.put('/addresses/:id', protectRoute, async (req, res) => {
     try {
         const { id } = req.params;
-        const { label, address, city, state, zipCode, isDefault } = req.body;
+        const { label, address, city, state, zipCode, isDefault, lat, lng } = req.body;
 
         const addressDoc = await Address.findById(id);
         if (!addressDoc) {
@@ -115,6 +168,8 @@ router.put('/addresses/:id', protectRoute, async (req, res) => {
                 city: city || addressDoc.city,
                 state: state || addressDoc.state,
                 zipCode: zipCode || addressDoc.zipCode,
+                lat: lat !== undefined ? lat : addressDoc.lat,
+                lng: lng !== undefined ? lng : addressDoc.lng,
                 isDefault: isDefault !== undefined ? isDefault : addressDoc.isDefault
             },
             { new: true }

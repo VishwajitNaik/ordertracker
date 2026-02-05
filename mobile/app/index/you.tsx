@@ -28,8 +28,20 @@ interface Product {
   Title: string;
   from: string;
   to: string;
-  fromAddress?: any;
-  toAddress?: any;
+  fromLocation: { text: string; lat: number; lng: number };
+  toLocation: { text: string; lat: number; lng: number };
+  fromAddress?: {
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
+  toAddress?: {
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
   description: string;
   price?: number;
   weight: string;
@@ -330,7 +342,7 @@ export default function YouPage() {
           <View style={styles.locationRow}>
             <Ionicons name="location" size={12} color="#FF6B6B" />
             <Text style={styles.locationText} numberOfLines={1}>
-              To: {item.toAddress ? `${item.toAddress.address}, ${item.toAddress.city}, ${item.toAddress.state} ${item.toAddress.zipCode}` : item.to}
+              To: {item.toLocation?.text || 'N/A'}
             </Text>
           </View>
         </View>
@@ -529,12 +541,12 @@ export default function YouPage() {
           <Text style={styles.statusBadgeText}>{item.status || 'scheduled'}</Text>
         </View>
       </View>
-
+ 
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle} numberOfLines={2}>
           {item.from} → {item.to}
         </Text>
-
+ 
         <View style={styles.cardMeta}>
           <View style={styles.metaItem}>
             <Ionicons name="car-outline" size={12} color="#666" />
@@ -545,12 +557,19 @@ export default function YouPage() {
             <Text style={styles.metaText}>{item.requestedUsers?.length || 0} requests</Text>
           </View>
         </View>
-
+ 
         <View style={styles.travelDetails}>
           <Text style={styles.detailText}>📅 {item.date}</Text>
           <Text style={styles.detailText}>🕐 {item.gotime} - {item.arrivaltime}</Text>
         </View>
-
+ 
+        {/* Show requests summary if there are any */}
+        {item.requestedUsers && item.requestedUsers.length > 0 && (
+          <View style={styles.requestsSummary}>
+            <Text style={styles.requestsSummaryTitle}>Delivery Requests ({item.requestedUsers.length})</Text>
+          </View>
+        )}
+ 
         <View style={styles.cardActions}>
           <TouchableOpacity
             style={styles.actionButton}
@@ -1249,6 +1268,70 @@ const styles = StyleSheet.create({
   },
   travelDetails: {
     marginBottom: 8,
+  },
+  requestsSummary: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  requestsSummaryTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1976d2',
+    marginBottom: 8,
+  },
+  requestsList: {
+    gap: 8,
+  },
+  requestItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 6,
+  },
+  requestUserInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  requestUserName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+  },
+  requestType: {
+    fontSize: 11,
+    color: '#666',
+  },
+  requestDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  requestPrice: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  requestStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  requestStatusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  moreRequestsText: {
+    fontSize: 11,
+    color: '#666',
+    fontStyle: 'italic',
   },
   vehicleDetails: {
     flexDirection: 'row',

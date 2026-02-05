@@ -28,11 +28,23 @@ const { width, height } = Dimensions.get("window");
 const isSmallDevice = width < 375;
 
 // Type definitions
+interface Address {
+  _id: string;
+  label: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  lat: number;
+  lng: number;
+  isDefault: boolean;
+}
+
 interface Shop {
   _id: string;
   name: string;
   shopType: string;
-  location: string;
+  location: Address;
   images: string[];
   openingTime: string;
   closingTime: string;
@@ -52,10 +64,12 @@ interface FormData {
 export default function AddShop() {
   const addShop = useAuthStore((state) => state.addShop);
   const fetchShops = useAuthStore((state) => state.fetchShops);
+  const fetchAddresses = useAuthStore((state) => state.fetchAddresses);
   const shops = useAuthStore((state) => state.shops);
+  const addresses = useAuthStore((state) => state.addresses);
   const loading = useAuthStore((state) => state.isLoading);
   const router = useRouter();
-  
+
   const [formData, setFormData] = useState<FormData>({
     name: "",
     shopType: "",
@@ -70,6 +84,7 @@ export default function AddShop() {
 
   useEffect(() => {
     fetchShops();
+    fetchAddresses();
   }, []);
 
   const pickImages = () => {
@@ -251,7 +266,9 @@ export default function AddShop() {
             </View>
             <View style={styles.cardRow}>
               <Ionicons name="location" size={16} color="#64748b" />
-              <Text style={styles.cardText} numberOfLines={2}>Location: {item.location}</Text>
+              <Text style={styles.cardText} numberOfLines={2}>
+                Location: {item.location && item.location.address ? `${item.location.address}, ${item.location.city}` : 'N/A'}
+              </Text>
             </View>
             <View style={styles.cardRow}>
               <Ionicons name="time" size={16} color="#64748b" />
@@ -335,14 +352,30 @@ export default function AddShop() {
                 <Ionicons name="location" size={18} color="#3b82f6" style={styles.inputIcon} />
                 <Text style={styles.inputLabel}>Location *</Text>
               </View>
-              <TextInput
-                style={[styles.input, styles.inputWithIcon]}
-                placeholder="Full address"
-                placeholderTextColor="#94a3b8"
-                value={formData.location}
-                onChangeText={(text) => handleInputChange("location", text)}
-                returnKeyType="next"
-              />
+              {addresses.length > 0 ? (
+                <View style={styles.pickerWrapper}>
+                  <Picker
+                    selectedValue={formData.location}
+                    onValueChange={(value: string) => handleInputChange("location", value)}
+                    style={styles.picker}
+                    dropdownIconColor="#3b82f6"
+                  >
+                    <Picker.Item label="Select a location" value="" style={styles.pickerItem} />
+                    {addresses.map((address) => (
+                      <Picker.Item
+                        key={address._id}
+                        label={`${address.label}: ${address.address}, ${address.city}`}
+                        value={address._id}
+                        style={styles.pickerItem}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+              ) : (
+                <View style={styles.noAddressesContainer}>
+                  <Text style={styles.noAddressesText}>No addresses found. Please add an address in your profile first.</Text>
+                </View>
+              )}
             </View>
 
             {/* Images */}
@@ -850,6 +883,19 @@ const styles = StyleSheet.create({
   },
   cardDotActive: {
     backgroundColor: "#fff",
+  },
+  noAddressesContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 16,
+    alignItems: "center",
+  },
+  noAddressesText: {
+    fontSize: 14,
+    color: "#64748b",
+    textAlign: "center",
   },
 });
 

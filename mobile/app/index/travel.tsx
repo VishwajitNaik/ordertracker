@@ -533,10 +533,13 @@ const AddTravel = () => {
                         <Text style={styles.requestText}>
                           {req.userId.username} - Product: {req.productId?.Title || 'Unknown'} - ₹{req.price} - {req.status}
                         </Text>
+                        <Text style={styles.requestMeta}>
+                          {req.fromUserId?.username} → {req.toUserId?.username}
+                        </Text>
                         {req.status === 'pending' && (
                           <TouchableOpacity
                             style={styles.acceptRequestButton}
-                            onPress={() => acceptTravelRequest(item._id, req.userId._id, req.productId?._id)}
+                            onPress={() => acceptTravelRequest(item._id, user._id, req.productId?._id)}
                           >
                             <Text style={styles.acceptRequestButtonText}>Accept</Text>
                           </TouchableOpacity>
@@ -906,6 +909,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     flex: 1,
+  },
+  requestMeta: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
   },
   acceptRequestButton: {
     backgroundColor: '#4CAF50',
